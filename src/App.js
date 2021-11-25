@@ -2,13 +2,14 @@ import React, { createContext, useContext, useEffect, useReducer, useRef, useSta
 
 const HOST_API="http://localhost:8080/api"
 const initialState={
-  list: []
+  list: [],
+  item: {}
 }
 const Store =createContext(initialState)
 const Form=()=>{
-  const {dispatch}=useContext(Store);
+  const {dispatch,state: {item}}=useContext(Store);
   const formref=useRef(null)
-  const [state,setState]=useState({});
+  const [state,setState]=useState(item);
 
   const onAdd=(event) => {
     event.preventDefault();
@@ -33,12 +34,41 @@ const Form=()=>{
       formref.current.reset();
     })
   }
+  const onEdit=(event) => {
+    event.preventDefault();
+  
+    const request={
+      name:state.name,
+      id:item.id,
+      isComplete:item.isCompleted
+    }
+  
+    fetch(HOST_API+"/todo",{
+      method:"PUT",
+      body: JSON.stringify(request),
+      headers: {
+        'content-type':'application/json'
+      }
+    })
+    .then(response=>response.json())
+    .then((todo)=>{
+      dispatch({type: "update-item",item:todo});
+      setState({name:""});
+      formref.current.reset();
+    })
+  }
+  
 
   return <form ref={formref}>
-    <input type="text" name="name" onChange={(event)=>{
+    <input type="text" name="name" defaultValue={item.name} onChange={(event)=>{
       setState({...state,name: event.target.value})
     }}></input>
-    <button onClick={onAdd}>Agregar</button>
+    {
+    item.id &&  <button onClick={onEdit}>Actualizar</button>
+    }
+        {
+    !item.id &&  <button onClick={onAdd}>Agregar</button>
+    }
   </form>
 }
 
@@ -61,6 +91,12 @@ const onDelete=(id)=>{
   })
 }
 
+
+const onEdit=(todo) => {
+ dispatch({type: "edit-item",item: todo})
+
+}
+
   return <div>
       <table>
         <thead>
@@ -71,13 +107,13 @@ const onDelete=(id)=>{
           </tr>
         </thead>
         <tbody>
-          {state.list.map((todo)=>{
-              return <tr key={todo.id}>
+          {state.list.map((todo,index)=>{
+              return <tr key={index}>
                 <td>{todo.id}</td>
                 <td>{todo.name}</td>
-                <td>{todo.isCompleted}</td>
+                <td>{todo.isCompleted ?"SI":"NO"}</td>
                 <td><button onClick={()=>onDelete(todo.id)}>Eliminar</button></td>
-                <td><button onClick={()=>onEdit(todo.id)}>Editar</button></td>
+                <td><button onClick={()=>onEdit(todo)}>Editar</button></td>
               </tr>
             })
           }
@@ -89,10 +125,18 @@ const onDelete=(id)=>{
 function reducer(state,action){
   switch (action.type) {
     case 'delete-item':
-      const listUpdate=state.filter((item)=>{
+      const listUpdate=state.list.filter((item)=>{
         return item.id !== action.id;
       })
       return {...state, list:listUpdate}
+    case 'update-item':
+      const listUpdateEdit=state.list.map((item)=>{
+        if(item.id === action.item.id){
+          return action.item
+        }
+        return item;
+      })
+      return {...state, list:listUpdateEdit, item:{}}
     case 'update-list':
       return {...state, list:action.list}
     case 'edit-item':
